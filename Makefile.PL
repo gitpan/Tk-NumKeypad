@@ -12,7 +12,7 @@ use vars qw/$pm $widinfo $widtrib %widtrib/;
 $pm = 'NumKeypad';             # widget Class name
 %widinfo = (                    # PPM widget information
     ABSTRACT => 'Numeric Keypad widget',
-    AUTHOR   => 'Steve Roscio (steve@HauntedMines.org)',
+    AUTHOR   => 'Steve Roscio (steve@cpan.org)',
 );
 $widtrib = 'numkeypadtest.pl';        # widtrib demo file name
 

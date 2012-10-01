@@ -4,9 +4,12 @@
 #
 #-----------------------------------------------------------------------------
 
+# TODO:  add -math mode to give / * - + Enter keys
+# TODO:  allow keys to be changes, i.e. make . (dot) be a delete
+
 package Tk::NumKeypad;
 use vars qw/$VERSION/;
-$VERSION = '1.0';
+$VERSION = '1.3';
 
 use Tk::widgets qw/Button/;
 use base qw/Tk::Frame/;
@@ -23,6 +26,11 @@ sub ClassInit {
 sub Populate {
     my ($this, $args) = @_;
     $this->SUPER::Populate($args);
+    $this->ConfigSpecs(
+        -entry    => ['PASSIVE'],
+        -text     => '-entry',
+        'DEFAULT' => ['DESCENDANTS']
+    );
 
     # Keypad
     my $i = 0;
@@ -38,10 +46,6 @@ sub Populate {
         $this->Advertise("KP$n" => $btn);
         ++$i;
     }
-    $this->ConfigSpecs(
-        -entry    => ['PASSIVE'],
-        'DEFAULT' => ['DESCENDANTS']
-    );
     return $this;
 }
 
@@ -49,15 +53,20 @@ sub _padpress {
     my ($this, $n) = @_;
     my $e = $this->cget('-entry');
     return if !$e;
-    if ($e->selectionPresent) {
-        $e->delete('sel.first', 'sel.last');
+    if ($e->isa("Tk::Entry")) {
+        # Entry widget
+        return $e->delete(0, 'end')
+            if $n eq 'C';
+        $e->delete('sel.first', 'sel.last')
+            if $e->selectionPresent;
     }
-    if ($n eq 'C') {
-        return $e->delete(0, 'end');
+    else {
+        # Text widget
+        return $e->delete('1.0', 'end') if $n eq 'C';
+        $e->delete('sel.first', 'sel.last')
+            if $e->tagRanges('sel');
     }
-    $e->insert(
-        'insert', $n
-        );
+    $e->insert('insert', $n);
 }
 
 __END__
@@ -68,7 +77,7 @@ Tk::NumKeypad - A Numeric Keypad widget
 
 =head1 SYNOPSIS
 
-    my $e = $mw->Entry(...)->pack;   # Some entry widget
+    my $e = $mw->Entry(...)->pack;   # Some entry or text widget
     my $nkp = $mw->NumKeypad(-entry => $e)->pack;  # Numeric keypad
 
 =head1 DESCRIPTION
@@ -93,8 +102,12 @@ The following options/value pairs are supported:
 
 =item B<-entry>
 
-Identifies the associated Tk::Entry widget to be populated or cleared
+Identifies the associated Tk::Entry or Tk::Text widget to be populated or cleared
 by this keypad.
+
+=item B<-text>
+
+Alias for -entry.  Use of -text is preferred if the widget really is a Tk::Text.
 
 =back
 
@@ -109,12 +122,35 @@ They are KP0, KP1, ... KP9, KP. and KPC .
 
 =head1 AUTHOR
 
-Steve (at) HauntedMines (dot) org
+Steve Roscio  C<< <roscio@cpan.org> >>
 
-Copyright (C) 2010. Steve Roscio.  All rights reserved.
+Copyright (c) 2010, Steve Roscio C<< <roscio@cpan.org> >>. All rights reserved.
 
-This program is free software, you can redistribute it and/or modify it
-under the same terms as Perl itself.
+This module is free software; you can redistribute it and/or
+modify it under the same terms as Perl itself. See L<perlartistic>.
+
+=head1 DISCLAIMER OF WARRANTY
+
+Because this software is licensed free of charge, there is no warranty
+for the software, to the extent permitted by applicable law.  Except when
+otherwise stated in writing the copyright holders and/or other parties
+provide the software "as is" without warranty of any kind, either
+expressed or implied, including, but not limited to, the implied
+warranties of merchantability and fitness for a particular purpose.  The
+entire risk as to the quality and performance of the software is with
+you.  Should the software prove defective, you assume the cost of all
+necessary servicing, repair, or correction.
+
+In no event unless required by applicable law or agreed to in writing
+will any copyright holder, or any other party who may modify and/or
+redistribute the software as permitted by the above licence, be
+liable to you for damages, including any general, special, incidental,
+or consequential damages arising out of the use or inability to use
+the software (including but not limited to loss of data or data being
+rendered inaccurate or losses sustained by you or third parties or a
+failure of the software to operate with any other software), even if
+such holder or other party has been advised of the possibility of
+such damages.
 
 =head1 KEYWORDS
 
