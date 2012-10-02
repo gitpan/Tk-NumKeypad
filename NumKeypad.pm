@@ -4,12 +4,9 @@
 #
 #-----------------------------------------------------------------------------
 
-# TODO:  add -math mode to give / * - + Enter keys
-# TODO:  allow keys to be changes, i.e. make . (dot) be a delete
-
 package Tk::NumKeypad;
 use vars qw/$VERSION/;
-$VERSION = '1.3';
+$VERSION = '1.4';
 
 use Tk::widgets qw/Button/;
 use base qw/Tk::Frame/;
@@ -27,20 +24,27 @@ sub Populate {
     my ($this, $args) = @_;
     $this->SUPER::Populate($args);
     $this->ConfigSpecs(
-        -entry    => ['PASSIVE'],
+        -entry    => ['PASSIVE', 'entry',  'Entry',  undef],
+        -keysub   => ['PASSIVE', 'keysub', 'Keysub', {}],
+        -keyval   => ['PASSIVE', 'keyval', 'Keyval', {}],
+        -math     => ['PASSIVE', 'math',   'Math',   0],
         -text     => '-entry',
         'DEFAULT' => ['DESCENDANTS']
     );
 
     # Keypad
     my $i = 0;
-    foreach my $n (qw{7 8 9 4 5 6 1 2 3 . 0 C}) {
+    my $math = $args->{-math};
+    my $width = $math ? 4 : 3;
+    my $keysub = $args->{-keysub};
+    my @keymap = $math ? qw{7 8 9 / 4 5 6 * 1 2 3 - . 0 C +} : qw{7 8 9 4 5 6 1 2 3 . 0 C};
+    foreach my $n (@keymap) {
         my $btn = $this->Button(
-            -text    => $n,
+            -text    => defined $keysub->{$n}? $keysub->{$n} : $n,
             -command => sub {$this->_padpress($n);},
             )->grid(
-            -row    => int($i / 3),
-            -column => $i % 3,
+            -row    => int($i / $width),
+            -column => $i % $width,
             -sticky => 'nsew'
             );
         $this->Advertise("KP$n" => $btn);
@@ -53,20 +57,37 @@ sub _padpress {
     my ($this, $n) = @_;
     my $e = $this->cget('-entry');
     return if !$e;
+
+    my $defval = {'C' => 'CLEAR'};
+    my $keyval = $this->cget('-keyval');
+    my $v = defined $keyval->{$n}? $keyval->{$n} : $defval->{$n} || $n;
+
     if ($e->isa("Tk::Entry")) {
+
         # Entry widget
+        return ($e->index('insert') > 0) && $e->delete($e->index('insert')-1)
+            if $v eq 'BACKSPACE';
         return $e->delete(0, 'end')
-            if $n eq 'C';
+            if $v eq 'CLEAR';
+        return $e->delete('insert')
+            if $v eq 'DELETE';
         $e->delete('sel.first', 'sel.last')
             if $e->selectionPresent;
     }
     else {
+
         # Text widget
-        return $e->delete('1.0', 'end') if $n eq 'C';
+        return ($e->index('insert') gt '1.0') && $e->delete('insert-1 chars')
+            if $v eq 'BACKSPACE';
+        return $e->delete('1.0', 'end')
+            if $v eq 'CLEAR';
+        return $e->delete('insert')
+            if $v eq 'DELETE';
         $e->delete('sel.first', 'sel.last')
             if $e->tagRanges('sel');
     }
-    $e->insert('insert', $n);
+
+    $e->insert('insert', $v);
 }
 
 __END__
@@ -86,15 +107,18 @@ A numeric keypad, including a clear button and a decimal point button.
 This is useful for touchscreen or kiosk applications where access to a 
 keyboard won't be available.
 
+Math keys may be included too; and you may substitute other characters
+for the default keys.
+
 The keypad is arranged as follows:
 
-    7 8 9
-    4 5 6
-    1 2 3
-    . 0 C
+    7 8 9           7 8 9 /
+    4 5 6     or    4 5 6 *
+    1 2 3           1 2 3 -
+    . 0 C           . 0 C +
 
-The widget is designed to supply values to an Entry widget.
-Specify the Entry widget with the -entry option.
+The widget is designed to supply values to a Tk::Entry or Tk::Text widget.
+Specify the Tk::Entry or Tk::Text widget with the -entry option.
 
 The following options/value pairs are supported:
 
@@ -104,6 +128,41 @@ The following options/value pairs are supported:
 
 Identifies the associated Tk::Entry or Tk::Text widget to be populated or cleared
 by this keypad.
+
+=item B<-keysub>
+
+Provide a hashref of substitution strings for the labels on the button keys.
+For example, to change the 'C' (clear) key to an 'X':
+
+  -keysub => {'C' => 'X'}
+
+The keys still return their original values, unless you also use -keyval.
+
+=item B<-keyval>
+
+Provide a hashref of alternate values to provide for keys, that's put into your
+Tk::Entry or Tk::Text widget.  For example,
+
+  -keyval => {'1' => 'one '}
+
+Note that the special values 'BACKSPACE', 'CLEAR', and 'DELETE'.
+'BACKSPACE' will delete one character back from the current cursor position.
+'CLEAR' will clear the contents of your text or entry widget.
+'DELETE' will delet the character at (after) the current cursor position.
+
+By default, the 'C' key is associated with the 'CLEAR' action.
+
+A popular modification of this KeyPad widget is to change the dot (.) key
+into a backspace key, like this:
+
+   -keysub => {'.' => "\x{21d0}"},  # this is the double-line left arrow symbol
+   -keyval => {'.' => 'BACKSPACE'},
+
+
+=item B<-math>
+
+If true, the mathematics keys / (divide), * (multiply), - (subtraction),
+and + (addition) are included in the keypad.
 
 =item B<-text>
 
@@ -117,14 +176,17 @@ None.
 
 =head1 ADVERTISED SUBWIDGETS
 
-The individual buttons are advertised as "KP" + the button label.
+The individual buttons are advertised as "KP" + the default button label.
 They are KP0, KP1, ... KP9, KP. and KPC .
+With -math enabled, there are also KP/ KP* KP- and KP+ subwidgets.
+These subwidget names do not change when you substitute key labels or values.
 
 =head1 AUTHOR
 
 Steve Roscio  C<< <roscio@cpan.org> >>
 
-Copyright (c) 2010, Steve Roscio C<< <roscio@cpan.org> >>. All rights reserved.
+Copyright (c) 2010-2012, Steve Roscio C<< <roscio@cpan.org> >>.
+All rights reserved.
 
 This module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself. See L<perlartistic>.
@@ -157,3 +219,4 @@ such damages.
 NumKeypad
 
 =cut
+
